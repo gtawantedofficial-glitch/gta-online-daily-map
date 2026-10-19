@@ -30,14 +30,18 @@ const status = document.getElementById('status');
 if (!window.L) {
   status.textContent = 'Не удалось загрузить Leaflet. Проверь подключение к интернету.';
 } else {
-  const map = L.map('map', {crs: L.CRS.Simple, minZoom: -2, maxZoom: 3});
-  const bounds = [[0,0],[4096,4096]];
-  L.tileLayer('https://raw.githubusercontent.com/VIRUXE/gtav-map-tiles/master/tiles/{z}/{x}/{y}.jpg', {
-    minZoom: -2,
-    maxZoom: 3,
-    noWrap: true,
-    attribution: 'Map tiles: VIRUXE/gtav-map-tiles'
-  }).addTo(map);
+  const CRS = L.extend({}, L.CRS.Simple, {
+  transformation: new L.Transformation(1/32, 0, 1/32, 0)
+});
+const map = L.map('map', {crs: CRS, minZoom: 0, maxZoom: 5});
+  const bounds = [[0,0],[8192,8192]];
+  L.tileLayer('https://viruxe.github.io/gtav-map-tiles/satelite/{z}/{x}-{y}.webp', {
+  minZoom: 0,
+  maxZoom: 5,
+  noWrap: true,
+  bounds: [[0, 0], [8192, 8192]],
+  attribution: 'GTA V map tiles'
+}).addTo(map);
   map.fitBounds(bounds);
   status.textContent = 'Карта открыта. Если тайлы не появились, источник может использовать другую структуру или формат файлов.';
 }
