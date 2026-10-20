@@ -11,7 +11,7 @@ body{margin:0;background:#111827;color:#f3f4f6;font:16px Arial,sans-serif}
 header{padding:16px;background:#1f2937}
 h1{font-size:22px;margin:0 0 8px}
 p{margin:0;color:#cbd5e1;font-size:14px}
-#map{height:70vh;min-height:400px;background:#253247}
+#map{height:75vh;min-height:450px;background:#253247}
 #status{padding:14px;color:#cbd5e1}
 footer{padding:12px;font-size:13px;color:#94a3b8}
 </style>
@@ -22,28 +22,39 @@ footer{padding:12px;font-size:13px;color:#94a3b8}
 <p>Перемещай карту мышкой, приближай колёсиком или кнопками + и −.</p>
 </header>
 <div id="map"></div>
-<div id="status">Загружаем карту…</div>
-<footer>Интерактивная основа. Ежедневные точки появятся после проверки координат.</footer>
+<div id="status">Загружаем карту GTA V…</div>
+<footer>GTA Wanted — основа интерактивной карты. Ежедневные точки добавим после проверки координат.</footer>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const status = document.getElementById('status');
+
 if (!window.L) {
-  status.textContent = 'Не удалось загрузить Leaflet. Проверь подключение к интернету.';
+  status.textContent = 'Не удалось загрузить библиотеку карты. Проверь подключение к интернету.';
 } else {
   const CRS = L.extend({}, L.CRS.Simple, {
-  transformation: new L.Transformation(1/32, 0, 1/32, 0)
-});
-const map = L.map('map', {crs: CRS, minZoom: 0, maxZoom: 5});
-  const bounds = [[0,0],[256,256]];
+    transformation: new L.Transformation(1/32, 0, 1/32, 0)
+  });
+
+  const map = L.map('map', {
+    crs: CRS,
+    minZoom: 0,
+    maxZoom: 5,
+    zoomSnap: 1
+  });
+
+  const bounds = [[0, 0], [8192, 8192]];
+
   L.tileLayer('https://viruxe.github.io/gtav-map-tiles/satelite/{z}/{x}-{y}.webp', {
-  minZoom: 0,
-  maxZoom: 5,
-  noWrap: true,
-  bounds: [[0, 0], [256, 256]],
-  attribution: 'GTA V map tiles'
-}).addTo(map);
+    minZoom: 0,
+    maxZoom: 5,
+    noWrap: true,
+    bounds: bounds,
+    attribution: 'GTA V map tiles'
+  }).addTo(map);
+
   map.fitBounds(bounds);
-  status.textContent = 'Карта открыта. Если тайлы не появились, источник может использовать другую структуру или формат файлов.';
+  status.textContent = 'Карта загружается. Подожди несколько секунд.';
+  setTimeout(() => map.invalidateSize(), 300);
 }
 </script>
 </body>
