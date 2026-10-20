@@ -1,87 +1,54 @@
-<!doctype html>
-<html lang="ru">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GTA Wanted — интерактивная карта</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<style>
-*{box-sizing:border-box}
-body{margin:0;background:#111827;color:#f3f4f6;font:16px Arial,sans-serif}
-header{padding:16px;background:#1f2937}
-h1{font-size:22px;margin:0 0 8px}
-p{margin:0;color:#cbd5e1;font-size:14px}
-#map{height:75vh;min-height:450px;background:#253247}
-#status{padding:14px;color:#cbd5e1}
-footer{padding:12px;font-size:13px;color:#94a3b8}
-</style>
-</head>
-<body>
-<header>
-<h1>GTA Wanted — карта GTA V</h1>
-<p>Перемещай карту мышкой, приближай колёсиком или кнопками + и −.</p>
-</header>
-  <div id="filters" style="padding:12px;display:flex;flex-wrap:wrap;gap:8px">
-  <label><input type="checkbox" checked data-category="gun_van"> Фургон с оружием</label>
-  <label><input type="checkbox" checked data-category="street_dealers"> Уличные торговцы</label>
-  <label><input type="checkbox" checked data-category="shipwreck"> Затонувший корабль</label>
-  <label><input type="checkbox" checked data-category="ls_tags"> Метки LS</label>
-  <label><input type="checkbox" checked data-category="smoke_on_the_water"> Smoke on the Water</label>
-  <label><input type="checkbox" checked data-category="hidden_caches"> Тайники</label>
-  <label><input type="checkbox" checked data-category="junk_energy"> Junk Energy</label>
-  <label><input type="checkbox" checked data-category="treasure_chests"> Сундуки с сокровищами</label>
-  <label><input type="checkbox" checked data-category="buried_stashes"> Закопанные тайники</label>
-</div>
-<div id="map"></div>
-<div id="status">Загружаем карту GTA V…</div>
-<footer>GTA Wanted — основа интерактивной карты. Ежедневные точки добавим после проверки координат.</footer>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
-const status = document.getElementById('status');
+querySelectorAll('[data-category]').forEach(input => {
+      const layer = layers[input.dataset.category];
+      if (!layer) return;
+      if (input.checked) layer.addTo(map);
+      else map.removeLayer(layer);
+    });
+  }
 
-if (!window.L) {
-  status.textContent = 'Не удалось загрузить библиотеку карты. Проверь подключение к интернету.';
-} else {
-  const CRS = L.extend({}, L.CRS.Simple, {
-    transformation: new L.Transformation(1/32, 0, 1/32, 0)
+  document.querySelectorAll('[data-category]').forEach(input => {
+    input.addEventListener('change', updateFilters);
   });
 
-  const map = L.map('map', {
-    crs: CRS,
-    minZoom: 0,
-    maxZoom: 5,
-    zoomSnap: 1
-  });
-
-  const bounds = [[0, 0], [8192, 8192]];
-
-  L.tileLayer('https://viruxe.github.io/gtav-map-tiles/satelite/{z}/{x}-{y}.webp', {
-    minZoom: 0,
-    maxZoom: 5,
-    noWrap: true,
-    bounds: bounds,
-    attribution: 'GTA V map tiles'
-  }).addTo(map);
-
-  map.fitBounds(bounds);
-  fetch('../data/daily/' + new Date().toISOString().slice(0, 10) + '.json')
+  fetch('../data/locations.json')
     .then(response => {
-      if (!response.ok) throw new Error('Не удалось загрузить данные дня');
+      if (!response.ok) throw new Error('Не удалось загрузить locations.json');
       return response.json();
     })
-    .then(daily => {
-      if (daily.status !== 'published' || daily.source_checked !== true) {
-        status.textContent = 'Точки на сегодня пока не подтверждены.';
-        return;
-      }
-status.textContent = 'Загружены активные точки за ' + daily.date;
-}) 
+    .then(database => {
+      const points = Array.isArray(database.points) ? database.points : [];
+      renderPoints(points);
+      status.textContent = 'База загружена. Координат в базе: ' + points.length +
+        '. Ежедневные точки пока не подтверждены.';
+      const today = new Date().toISOString().slice(0,10);
+
+      return fetch('../data/daily/' + today + '.json')
+        .then(response => {
+          if (!response.ok) return null;
+          return response.json();
+        })
+        .then(daily => {
+          if (!daily  daily.status !== 'published'  daily.source_checked !== true) {
+            status.textContent = 'База загружена. Координат: ' + points.length +
+              '. Точки на сегодня пока не подтверждены.';
+            return;
+          }
+
+          const activeIds = new Set(
+            Object.values(daily.categories || {}).flat()
+              .map(item => typeof item === 'string' ? item : item.id)
+              .filter(Boolean)
+          );
+
+          const activePoints = points.filter(point => activeIds.has(point.id));
+          renderPoints(activePoints);
+          status.textContent = 'Загружены подтверждённые точки за ' + daily.date +
+            '. Количество: ' + activePoints.length;
+        });
+    })
     .catch(error => {
-      status.textContent = 'Ошибка загрузки ежедневных данных.';
-      console.error(error);
+      status.textContent = 'Ошибка загрузки данных: ' + error.message;
     });
-  status.textContent = 'Карта загружается. Подожди несколько секунд.';
-  setTimeout(() => map.invalidateSize(), 300);
 }
 </script>
 </body>
