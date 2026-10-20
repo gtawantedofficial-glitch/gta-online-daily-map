@@ -53,7 +53,7 @@ if (!window.L) {
   }).addTo(map);
 
   map.fitBounds(bounds);
-  fetch('../data/daily/2026-10-19.json')
+  fetch('../data/daily/' + new Date().toISOString().slice(0, 10) + '.json')
     .then(response => {
       if (!response.ok) throw new Error('Не удалось загрузить данные дня');
       return response.json();
