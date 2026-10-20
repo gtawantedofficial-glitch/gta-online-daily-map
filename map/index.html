@@ -53,6 +53,22 @@ if (!window.L) {
   }).addTo(map);
 
   map.fitBounds(bounds);
+  fetch('../data/daily/2026-10-19.json')
+    .then(response => {
+      if (!response.ok) throw new Error('Не удалось загрузить данные дня');
+      return response.json();
+    })
+    .then(daily => {
+      if (daily.status !== 'published' || daily.source_checked !== true) {
+        status.textContent = 'Точки на сегодня пока не подтверждены.';
+        return;
+      }
+status.textContent = 'Загружены активные точки за ' + daily.date;
+}) 
+    .catch(error => {
+      status.textContent = 'Ошибка загрузки ежедневных данных.';
+      console.error(error);
+    });
   status.textContent = 'Карта загружается. Подожди несколько секунд.';
   setTimeout(() => map.invalidateSize(), 300);
 }
