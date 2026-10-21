@@ -1,3 +1,16 @@
 {
-  "points": []
+  “points”: [
+    {
+      “id”: “gun_van_2026_10_21”,
+      “category”: “gun_van”,
+      “name”: “Gun Van — North Chumash”,
+      “gameCoordinates”: {
+        “x”: -2166.511,
+        “y”: 4289.503
+      },
+      “area”: “North Chumash”,
+      “source”: “https://www.gtacnnnnnnnnnnn.org/daily”,
+      “verified”: false
+    }
+  ]
 }
