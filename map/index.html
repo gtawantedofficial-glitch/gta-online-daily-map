@@ -1,55 +1,332 @@
-querySelectorAll('[data-category]').forEach(input => {
-      const layer = layers[input.dataset.category];
-      if (!layer) return;
-      if (input.checked) layer.addTo(map);
-      else map.removeLayer(layer);
+<!DOCTYPE html>
+
+<html lang=“ru”>
+
+<head>
+
+  <meta charset=“UTF-8”>
+
+  <meta name=“viewport” content=“width=device-width, initial-scale=1.0”>
+
+  <title>GTA Wanted — Daily Map</title>
+
+  <link rel=“stylesheet” href=“https://unpkg.com/leaflet@1.9.4/dist/leaflet.css”>
+
+  <style>
+
+    body {
+
+      margin: 0;
+
+      font-family: Arial, sans-serif;
+
+      background: #171717;
+
+      color: white;
+
+    }
+
+    h2 {
+
+      margin: 12px;
+
+      font-size: 20px;
+
+    }
+
+    #filters {
+
+      display: flex;
+
+      flex-wrap: wrap;
+
+      gap: 10px;
+
+      padding: 12px;
+
+      background: #222;
+
+    }
+
+    #filters label {
+
+      font-size: 14px;
+
+      white-space: nowrap;
+
+    }
+
+    #status {
+
+      padding: 10px 12px;
+
+      font-size: 14px;
+
+      background: #292929;
+
+    }
+
+    #map {
+
+      height: calc(100vh - 150px);
+
+      min-height: 400px;
+
+      background: #333;
+
+    }
+
+  </style>
+
+</head>
+
+<body>
+
+  <h2>GTA Wanted — Daily Map</h2>
+
+  <div id=“filters”>
+
+    <label><input type=“checkbox” data-category=“gun_van” checked> Gun Van</label>
+
+    <label><input type=“checkbox” data-category=“street_dealers” checked> Street Dealers</label>
+
+    <label><input type=“checkbox” data-category=“shipwreck” checked> Shipwreck</label>
+
+    <label><input type=“checkbox” data-category=“ls_tags” checked> LS Tags</label>
+
+    <label><input type=“checkbox” data-category=“smoke_on_the_water” checked> Smoke on the Water</label>
+
+    <label><input type=“checkbox” data-category=“hidden_caches” checked> Hidden Caches</label>
+
+    <label><input type=“checkbox” data-category=“junk_energy” checked> Junk Energy</label>
+
+    <label><input type=“checkbox” data-category=“treasure_chests” checked> Treasure Chests</label>
+
+    <label><input type=“checkbox” data-category=“buried_stashes” checked> Buried Stashes</label>
+
+  </div>
+
+  <div id=“status”>Загрузка карты и базы точек…</div>
+
+  <div id=“map”></div>
+
+  <script src=“https://unpkg.com/leaflet@1.9.4/dist/leaflet.js”></script>
+
+  <script>
+
+    const map = L.map(‘map’, {
+
+      crs: L.CRS.Simple,
+
+      minZoom: 0,
+
+      maxZoom: 5
+
     });
-  }
 
-  document.querySelectorAll('[data-category]').forEach(input => {
-    input.addEventListener('change', updateFilters);
-  });
+    const bounds = [[0, 0], [8192, 8192]];
 
-  fetch('../data/locations.json')
-    .then(response => {
-      if (!response.ok) throw new Error('Не удалось загрузить locations.json');
-      return response.json();
-    })
-    .then(database => {
-      const points = Array.isArray(database.points) ? database.points : [];
-      renderPoints(points);
-      status.textContent = 'База загружена. Координат в базе: ' + points.length +
-        '. Ежедневные точки пока не подтверждены.';
-      const today = new Date().toISOString().slice(0,10);
+    L.tileLayer(
 
-      return fetch('../data/daily/' + today + '.json')
-        .then(response => {
-          if (!response.ok) return null;
-          return response.json();
-        })
-        .then(daily => {
-          if (!daily  daily.status !== 'published'  daily.source_checked !== true) {
-            status.textContent = 'База загружена. Координат: ' + points.length +
-              '. Точки на сегодня пока не подтверждены.';
-            return;
-          }
+      ‘https://viruxe.github.io/gtav-map-tiles/satelite/{z}/{x}-{y}.webp’,
 
-          const activeIds = new Set(
-            Object.values(daily.categories || {}).flat()
-              .map(item => typeof item === 'string' ? item : item.id)
-              .filter(Boolean)
-          );
+      {
 
-          const activePoints = points.filter(point => activeIds.has(point.id));
-          renderPoints(activePoints);
-          status.textContent = 'Загружены подтверждённые точки за ' + daily.date +
-            '. Количество: ' + activePoints.length;
+        minZoom: 0,
+
+        maxZoom: 5,
+
+        bounds: bounds,
+
+        noWrap: true,
+
+        attribution: ‘GTA V map’
+
+      }
+
+    ).addTo(map);
+
+    map.fitBounds(bounds);
+
+    const status = document.getElementById(‘status’);
+
+    const markerLayers = [];
+
+    let allPoints = [];
+
+    let activeIds = null;
+
+    function getMapPosition(point) {
+
+      if (Array.isArray(point.position) &&
+
+          point.position.length >= 2) {
+
+        return point.position;
+
+      }
+
+      if (Number.isFinite(point.mapX) &&
+
+          Number.isFinite(point.mapY)) {
+
+        return [point.mapY, point.mapX];
+
+      }
+
+      if (Number.isFinite(point.x) &&
+
+          Number.isFinite(point.y)) {
+
+        return [point.y, point.x];
+
+      }
+
+      return null;
+
+    }
+
+    function renderPoints() {
+
+      markerLayers.forEach(layer => map.removeLayer(layer));
+
+      markerLayers.length = 0;
+
+      const enabledCategories = new Set(
+
+        Array.from(document.querySelectorAll(‘[data-category]’))
+
+          .filter(input => input.checked)
+
+          .map(input => input.dataset.category)
+
+      );
+
+      const visiblePoints = allPoints.filter(point => {
+
+        if (!enabledCategories.has(point.category)) return false;
+
+        if (activeIds && !activeIds.has(point.id)) return false;
+
+        return true;
+
+      });
+
+      visiblePoints.forEach(point => {
+
+        const position = getMapPosition(point);
+
+        if (!position) return;
+
+        const marker = L.circleMarker(position, {
+
+          radius: 7,
+
+          color: ‘#ffffff’,
+
+          weight: 2,
+
+          fillColor: activeIds ? ‘#ffcc00’ : ‘#35b86b’,
+
+          fillOpacity: 0.95
+
         });
-    })
-    .catch(error => {
-      status.textContent = 'Ошибка загрузки данных: ' + error.message;
+
+        marker.bindPopup(
+
+          ‘<b>’ + (point.name  point.id  point.category) + ‘</b>’ +
+
+          (point.area ? ‘<br>’ + point.area : ‘’) +
+[21.10.2026 12:21] Bar 4 Car Estepona: ‘<br>Категория: ‘ + point.category
+
+        );
+
+        marker.addTo(map);
+
+        markerLayers.push(marker);
+
+      });
+
+      status.textContent =
+
+        ‘Точек в базе: ‘ + allPoints.length +
+
+        ‘. Отображается на карте: ‘ + visiblePoints.length +
+
+        (activeIds ? ‘. Используется дневная ротация.’ :
+
+          ‘. Дневная ротация не подтверждена.’);
+
+    }
+
+    document.querySelectorAll(‘[data-category]’).forEach(input => {
+
+      input.addEventListener(‘change’, renderPoints);
+
     });
-}
-</script>
+
+    fetch(‘../data/locations.json’)
+
+      .then(response => {
+
+        if (!response.ok) {
+
+          throw new Error(‘Не удалось загрузить locations.json’);
+
+        }
+
+        return response.json();
+
+      })
+
+      .then(database => {
+
+        allPoints = Array.isArray(database.points)
+
+          ? database.points
+
+          : [];
+
+        const today = new Date().toISOString().slice(0, 10);
+
+        return fetch(‘../data/daily/‘ + today + ‘.json’)
+
+          .then(response => response.ok ? response.json() : null)
+
+          .catch(() => null);
+
+      })
+
+      .then(daily => {
+
+        if (daily &&
+
+            daily.status === ‘published’ &&
+
+            daily.source_checked === true) {
+
+          const ids = Object.values(daily.categories || {}).flat()
+
+            .map(item => typeof item === ‘string’ ? item : item && item.id)
+
+            .filter(Boolean);
+
+          activeIds = new Set(ids);
+
+        }
+
+        renderPoints();
+
+      })
+
+      .catch(error => {
+
+        status.textContent = ‘Ошибка загрузки данных: ‘ + error.message;
+
+      });
+
+  </script>
+
 </body>
+
 </html>
